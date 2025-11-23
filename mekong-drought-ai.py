@@ -5,6 +5,8 @@ import joblib
 import plotly.graph_objects as go
 import plotly.express as px
 import os
+from datetime import datetime, timedelta
+
 # Page configuration
 st.set_page_config(
     page_title="Agricultural Drought Early Warning System - Mekong Delta",
@@ -13,7 +15,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for professional styling
+# Custom CSS for professional styling - UPDATED CSS
 st.markdown("""
     <style>
     .main-header {
@@ -53,14 +55,6 @@ st.markdown("""
         color: white;
         box-shadow: 0 8px 25px rgba(0,0,0,0.1);
         margin-bottom: 1rem;
-    }
-    .prediction-card {
-        background: linear-gradient(135deg, #00b894 0%, #00a085 100%);
-        padding: 3rem;
-        border-radius: 25px;
-        text-align: center;
-        box-shadow: 0 15px 35px rgba(0,0,0,0.2);
-        margin: 2rem 0;
     }
     .metric-card {
         background: white;
@@ -106,13 +100,6 @@ st.markdown("""
         background: linear-gradient(135deg, #dfe6e9 0%, #b2bec3 100%);
         border-radius: 15px;
     }
-    .season-characteristics {
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-        padding: 1rem;
-        border-radius: 10px;
-        margin-top: 1rem;
-        border-left: 4px solid #3498db;
-    }
     .season-dry {
         background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
         padding: 1rem;
@@ -127,16 +114,111 @@ st.markdown("""
         margin-top: 1rem;
         border-left: 4px solid #3498db;
     }
-    .season-stat {
-        background: white;
+    /* CSS FOR STAT CARDS */
+    .season-stat-rainfall {
+        background: linear-gradient(135deg, #4FC3F7 0%, #0288D1 100%);
         padding: 0.8rem;
         border-radius: 8px;
         margin: 0.5rem 0;
         box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        color: white;
+        border-left: 4px solid #0277BD;
     }
-    .author-flag {
-        font-size: 1.2rem;
-        margin-right: 0.5rem;
+    .season-stat-temperature {
+        background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%);
+        padding: 0.8rem;
+        border-radius: 8px;
+        margin: 0.5rem 0;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        color: white;
+        border-left: 4px solid #EF6C00;
+    }
+    .season-stat-humidity {
+        background: linear-gradient(135deg, #4CAF50 0%, #388E3C 100%);
+        padding: 0.8rem;
+        border-radius: 8px;
+        margin: 0.5rem 0;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        color: white;
+        border-left: 4px solid #2E7D32;
+    }
+    .season-stat-risk-high {
+        background: linear-gradient(135deg, #F44336 0%, #D32F2F 100%);
+        padding: 0.8rem;
+        border-radius: 8px;
+        margin: 0.5rem 0;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        color: white;
+        border-left: 4px solid #C62828;
+    }
+    .season-stat-risk-low {
+        background: linear-gradient(135deg, #66BB6A 0%, #388E3C 100%);
+        padding: 0.8rem;
+        border-radius: 8px;
+        margin: 0.5rem 0;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        color: white;
+        border-left: 4px solid #2E7D32;
+    }
+    .outlook-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 2rem;
+        border-radius: 15px;
+        color: white;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        margin: 1rem 0;
+        text-align: center;
+    }
+    .outlook-mild {
+        background: linear-gradient(135deg, #f1c40f 0%, #f39c12 100%);
+    }
+    .outlook-moderate {
+        background: linear-gradient(135deg, #e67e22 0%, #d35400 100%);
+    }
+    .outlook-severe {
+        background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+    }
+    .current-forecast {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 3rem 2rem;
+        border-radius: 25px;
+        text-align: center;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        margin: 2rem 0;
+        border: 3px solid rgba(255,255,255,0.2);
+    }
+    .confidence-badge {
+        background: rgba(255,255,255,0.2);
+        padding: 1rem;
+        border-radius: 15px;
+        margin: 2rem auto;
+        max-width: 300px;
+    }
+    .risk-indicator {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-weight: bold;
+        margin: 0.5rem 0;
+    }
+    .trend-indicator-up {
+        color: #e74c3c;
+        font-weight: bold;
+    }
+    .trend-indicator-down {
+        color: #2ecc71;
+        font-weight: bold;
+    }
+    .trend-indicator-stable {
+        color: #f39c12;
+        font-weight: bold;
+    }
+    .recommendation-box {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        padding: 1.5rem;
+        border-radius: 15px;
+        border-left: 5px solid #3498db;
+        margin: 1rem 0;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -152,7 +234,7 @@ st.markdown("""
 # Author information
 st.markdown("""
     <div class="author-info">
-        👨‍🔬 <strong>Author:</strong> Nguyen Van Quy & Dinh Ba Duy<br>
+        🎭 <strong>Authors:</strong> Nguyen Van Quy & Dinh Ba Duy<br>
         <strong>Affiliation:</strong> Joint Vietnam-Russia Tropical Science and Technology Research Center
     </div>
 """, unsafe_allow_html=True)
@@ -162,7 +244,7 @@ col1, col2, col3 = st.columns(3)
 with col1:
     st.markdown("""
         <div class="info-card">
-            <h3 style='color: white; margin: 0;'>📍 Region</h3>
+            <h3 style='color: white; margin: 0;'>🗺️ Region</h3>
             <p style='color: white; font-size: 1.1rem; margin: 0.5rem 0 0 0;'>Mekong Delta, Vietnam</p>
         </div>
     """, unsafe_allow_html=True)
@@ -178,18 +260,17 @@ with col2:
 with col3:
     st.markdown("""
         <div class="info-card">
-            <h3 style='color: white; margin: 0;'>🎯 System</h3>
-            <p style='color: white; font-size: 1.1rem; margin: 0.5rem 0 0 0;'>Models built with Python and R</p>
+            <h3 style='color: white; margin: 0;'>💻 System</h3>
+            <p style='color: white; font-size: 1.1rem; margin: 0.5rem 0 0 0;'>Python and R Models</p>
         </div>
     """, unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# Load model với error handling tốt hơn
+# Load model with improved error handling
 @st.cache_resource
 def load_model():
     try:
-        # Kiểm tra file tồn tại
         if not os.path.exists('models/XGBoost_drought_model.pkl'):
             st.error("❌ Model file not found. Please check the models folder.")
             return None, None
@@ -207,10 +288,10 @@ if model is None or scaler is None:
     st.error("🚫 Unable to load required model files. Please check your deployment.")
     st.stop()
 
-# Season data for Mekong Delta (English) - UPDATED WITH CORRECT DESCRIPTIONS
+# Season data for Mekong Delta - UPDATED WITH STANDARD TERMINOLOGY
 SEASON_DATA = {
     "Dry Season (Dec-Apr)": {
-        "description": "Dry season characterized by low rainfall, high temperatures, and increased drought vulnerability",
+        "description": "Characterized by low rainfall, high temperatures, and increased drought vulnerability",
         "characteristics": [
             "🌵 Low rainfall: 100-200 mm (5-10% of annual total)",
             "⚠️ High drought risk: Increased vulnerability to drought conditions",
@@ -228,10 +309,10 @@ SEASON_DATA = {
             "agriculture": "Winter-Spring crop"
         },
         "color": "season-dry",
-        "risk_level": "🟠 High Alert: "
+        "risk_level": "🟠 High Alert"
     },
     "Rainy Season (May-Nov)": {
-        "description": "Rainy season featuring abundant rainfall, flooding, and optimal vegetation growth conditions",
+        "description": "Features abundant rainfall, flooding, and optimal vegetation growth conditions",
         "characteristics": [
             "🌧️ High rainfall: 1,300-2,000 mm (90-95% of annual total)",
             "🌿 Optimal vegetation: Lush plant growth and green coverage",
@@ -249,7 +330,7 @@ SEASON_DATA = {
             "agriculture": "Summer-Autumn crops"
         },
         "color": "season-rainy",
-        "risk_level": "🟢 Normal Conditions: "
+        "risk_level": "🟢 Normal Conditions"
     }
 }
 
@@ -258,73 +339,78 @@ with st.sidebar:
     st.markdown("""
         <div class="sidebar-content">
             <h2 style='color: white; text-align: center;'>🎛️ Control Panel</h2>
-            <p style='color: white; text-align: center;'>Adjust parameters for prediction</p>
+            <p style='color: white; text-align: center;'>Adjust parameters for prediction analysis</p>
         </div>
     """, unsafe_allow_html=True)
 
-    # Season selection - UPDATED WITH CORRECT DESCRIPTIONS
-    with st.expander("🌦️ **Season Information**", expanded=True):
+    # Season selection - UPDATED
+    with st.expander("🌦️ **Seasonal Information**", expanded=True):
         season = st.selectbox(
             "Current Season",
             list(SEASON_DATA.keys()),
-            help="Mekong Delta seasonal patterns"
+            help="Mekong Delta seasonal patterns and characteristics"
         )
         
         # Display detailed season information
         season_info = SEASON_DATA[season]
         
-        # Hiển thị risk level
-        st.markdown(f"**{season_info['risk_level']} {season_info['description']}**")
+        # Display risk level
+        st.markdown(f"**{season_info['risk_level']}: {season_info['description']}**")
         
-        st.markdown("**🎯 Key Characteristics:**")
+        st.markdown("**🔍 Key Characteristics:**")
         for characteristic in season_info['characteristics']:
             st.markdown(f"• {characteristic}")
         
-        st.markdown("**📊 Season Statistics:**")
+        st.markdown("**📊 Seasonal Statistics:**")
         col_stat1, col_stat2 = st.columns(2)
         
         with col_stat1:
+            # Rainfall
             st.markdown(f"""
-                <div class="season-stat">
+                <div class="season-stat-rainfall">
                     <strong>🌧️ Rainfall:</strong><br>
-                    {season_info['statistics']['rainfall']}
+                    <span style='font-size: 1.1rem; font-weight: bold;'>{season_info['statistics']['rainfall']}</span>
                 </div>
             """, unsafe_allow_html=True)
             
+            # Temperature
             st.markdown(f"""
-                <div class="season-stat">
+                <div class="season-stat-temperature">
                     <strong>🌡️ Temperature:</strong><br>
-                    {season_info['statistics']['temperature']}
+                    <span style='font-size: 1.1rem; font-weight: bold;'>{season_info['statistics']['temperature']}</span>
                 </div>
             """, unsafe_allow_html=True)
         
         with col_stat2:
+            # Humidity
             st.markdown(f"""
-                <div class="season-stat">
+                <div class="season-stat-humidity">
                     <strong>💧 Humidity:</strong><br>
-                    {season_info['statistics']['humidity']}
+                    <span style='font-size: 1.1rem; font-weight: bold;'>{season_info['statistics']['humidity']}</span>
                 </div>
             """, unsafe_allow_html=True)
             
+            # Drought Risk
+            risk_class = "season-stat-risk-high" if season_info['statistics']['drought_risk'] == "High" else "season-stat-risk-low"
             st.markdown(f"""
-                <div class="season-stat">
+                <div class="{risk_class}">
                     <strong>⚠️ Drought Risk:</strong><br>
-                    {season_info['statistics']['drought_risk']}
+                    <span style='font-size: 1.1rem; font-weight: bold;'>{season_info['statistics']['drought_risk']}</span>
                 </div>
             """, unsafe_allow_html=True)
 
-    # Vegetation Health
-    with st.expander("🌱 **Vegetation Indicators**", expanded=True):
+    # Vegetation Health Indicators
+    with st.expander("🌱 **Vegetation Health Indicators**", expanded=True):
         ndvi = st.slider(
-            "🌿 NDVI - Vegetation Health Index",
+            "🌿 NDVI - Normalized Difference Vegetation Index",
             min_value=0.20, max_value=0.80, value=0.55, step=0.01,
-            help="Normalized Difference Vegetation Index (0.2-0.8)"
+            help="Vegetation health index ranging from 0.2 (sparse vegetation) to 0.8 (dense vegetation)"
         )
         
         vci = st.slider(
             "📊 VCI - Vegetation Condition Index",
             min_value=0.0, max_value=100.0, value=65.0, step=1.0,
-            help="Vegetation Condition Index (0-100%)"
+            help="Vegetation condition relative to historical minimum and maximum (0-100%)"
         )
         
         ndvi_3month_avg = st.slider(
@@ -356,7 +442,8 @@ with st.sidebar:
         
         precip_anomaly = st.slider(
             "📊 Precipitation Anomaly (%)",
-            min_value=-100.0, max_value=150.0, value=10.0, step=5.0
+            min_value=-100.0, max_value=150.0, value=10.0, step=5.0,
+            help="Deviation from long-term average precipitation"
         )
 
     # Temperature Data
@@ -393,8 +480,8 @@ except Exception as e:
     st.error(f"❌ Prediction error: {str(e)}")
     st.stop()
 
-# 5-Level Balanced Classification System
-drought_categories = ['No Drought', 'Light Drought', 'Moderate Drought', 'Severe Drought', 'Extreme Drought']
+# 5-Level Drought Classification System - STANDARD TERMINOLOGY
+drought_categories = ['No Drought', 'Mild Drought', 'Moderate Drought', 'Severe Drought', 'Extreme Drought']
 drought_colors = ['#2ecc71', '#f1c40f', '#e67e22', '#e74c3c', '#8b0000']
 drought_gradients = [
     'linear-gradient(135deg, #2ecc71 0%, #27ae60 100%)',
@@ -405,32 +492,26 @@ drought_gradients = [
 ]
 drought_descriptions = [
     "🌿 Normal vegetation conditions with adequate rainfall patterns",
-    "💧 Minor stress on vegetation with slightly below normal rainfall", 
+    "💧 Minor vegetation stress with slightly below normal rainfall", 
     "⚠️ Moderate vegetation stress with significant rainfall deficit",
     "🔥 Severe vegetation stress with prolonged rainfall deficit",
     "🚨 Extreme vegetation stress with critical water shortage conditions"
 ]
 
-# Main content - Prediction Result
-st.markdown('<div class="section-header">🎯 Prediction Result</div>', unsafe_allow_html=True)
+# Main content - Current Forecast Result
+st.markdown('<div class="section-header">🎯 Current Drought Forecast</div>', unsafe_allow_html=True)
 
 predicted_category = drought_categories[prediction]
 predicted_gradient = drought_gradients[prediction]
 predicted_description = drought_descriptions[prediction]
 confidence = prediction_proba[prediction] * 100
 
-# Large prediction display
+# Large forecast display
 st.markdown(f"""
-    <div style='background: {predicted_gradient}; 
-                padding: 4rem 2rem; 
-                border-radius: 25px; 
-                text-align: center; 
-                box-shadow: 0 20px 40px rgba(0,0,0,0.3);
-                margin: 2rem 0;
-                border: 3px solid rgba(255,255,255,0.2);'>
+    <div class="current-forecast" style='background: {predicted_gradient}'>
         <h1 style='color: white; margin: 0; font-size: 3.5rem; font-weight: 800; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);'>{predicted_category}</h1>
-        <div style='background: rgba(255,255,255,0.2); padding: 1rem; border-radius: 15px; margin: 2rem auto; max-width: 300px;'>
-            <p style='color: white; font-size: 1.5rem; margin: 0; font-weight: 600;'>Confidence: {confidence:.1f}%</p>
+        <div class="confidence-badge">
+            <p style='color: white; font-size: 1.5rem; margin: 0; font-weight: 600;'>Model Confidence: {confidence:.1f}%</p>
         </div>
         <p style='color: white; font-size: 1.3rem; margin: 1rem 0 0 0; font-weight: 500;'>
             {predicted_description}
@@ -438,8 +519,182 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
+# SHORT-TERM OUTLOOK SECTION - UPDATED
+st.markdown('<div class="section-header">🔮 Short-term Outlook (Next 30 Days)</div>', unsafe_allow_html=True)
+
+def predict_short_term_outlook(current_prediction, ndvi_trend, precip_trend, vci_trend, season):
+    """
+    Forecast drought conditions for next month based on current trends
+    """
+    # Trend scoring
+    trend_score = 0
+    
+    # NDVI trend analysis
+    if ndvi_trend < -0.05:  # Sharp decrease
+        trend_score += 2
+    elif ndvi_trend < -0.02:  # Slight decrease
+        trend_score += 1
+    elif ndvi_trend > 0.05:  # Sharp increase
+        trend_score -= 2
+    elif ndvi_trend > 0.02:  # Slight increase
+        trend_score -= 1
+    
+    # Precipitation trend analysis
+    if precip_trend < -20:  # Sharp decrease
+        trend_score += 2
+    elif precip_trend < -10:  # Slight decrease
+        trend_score += 1
+    elif precip_trend > 20:  # Sharp increase
+        trend_score -= 2
+    elif precip_trend > 10:  # Slight increase
+        trend_score -= 1
+    
+    # VCI trend analysis
+    if vci_trend < -10:  # Sharp decrease
+        trend_score += 2
+    elif vci_trend < -5:  # Slight decrease
+        trend_score += 1
+    elif vci_trend > 10:  # Sharp increase
+        trend_score -= 2
+    elif vci_trend > 5:  # Slight increase
+        trend_score -= 1
+    
+    # Seasonal adjustment
+    if season == "Dry Season (Dec-Apr)":
+        trend_score += 1
+    
+    # Outlook classification
+    if trend_score >= 3:
+        outlook = "worsening"
+    elif trend_score >= 1:
+        outlook = "slightly_worsening"
+    elif trend_score <= -3:
+        outlook = "improving"
+    elif trend_score <= -1:
+        outlook = "slightly_improving"
+    else:
+        outlook = "stable"
+    
+    return outlook, trend_score
+
+# Calculate trends
+ndvi_trend = ndvi - ndvi_lag1
+precip_trend = precip_anomaly
+vci_trend = vci - 60
+
+# Generate short-term forecast
+outlook, trend_score = predict_short_term_outlook(
+    prediction, ndvi_trend, precip_trend, vci_trend, season
+)
+
+# Display outlook results
+col_out1, col_out2 = st.columns([2, 1])
+
+with col_out1:
+    outlook_config = {
+        "worsening": {
+            "class": "outlook-severe",
+            "icon": "📈",
+            "level": "Deteriorating",
+            "message": "Conditions expected to worsen significantly"
+        },
+        "slightly_worsening": {
+            "class": "outlook-moderate",
+            "icon": "↗️", 
+            "level": "Slightly Deteriorating",
+            "message": "Conditions may slightly worsen"
+        },
+        "improving": {
+            "class": "outlook-mild",
+            "icon": "📉",
+            "level": "Improving", 
+            "message": "Conditions expected to improve"
+        },
+        "slightly_improving": {
+            "class": "outlook-mild",
+            "icon": "↘️",
+            "level": "Slightly Improving",
+            "message": "Conditions may slightly improve"
+        },
+        "stable": {
+            "class": "outlook-card",
+            "icon": "➡️",
+            "level": "Stable",
+            "message": "Conditions expected to remain stable"
+        }
+    }
+    
+    outlook_info = outlook_config[outlook]
+    
+    st.markdown(f"""
+        <div class="outlook-card {outlook_info['class']}">
+            <h2 style='color: white; margin: 0; font-size: 2.5rem;'>{outlook_info['icon']} {outlook_info['level']}</h2>
+            <p style='color: white; font-size: 1.2rem; margin: 1rem 0;'>{outlook_info['message']}</p>
+            <p style='color: white; font-size: 1rem; margin: 0.5rem 0 0 0; opacity: 0.9;'>
+                Based on current vegetation trends and precipitation patterns
+            </p>
+        </div>
+    """, unsafe_allow_html=True)
+
+with col_out2:
+    # Trend indicators with proper formatting
+    trend_ndvi = "↘️ Decreasing" if ndvi_trend < 0 else "↗️ Increasing" if ndvi_trend > 0 else "➡️ Stable"
+    trend_precip = "↘️ Below normal" if precip_trend < 0 else "↗️ Above normal" if precip_trend > 0 else "➡️ Normal"
+    trend_vci = "↘️ Decreasing" if vci_trend < 0 else "↗️ Increasing" if vci_trend > 0 else "➡️ Stable"
+    
+    st.markdown(f"""
+        <div class="metric-card">
+            <h3 style='color: #2c3e50; margin-bottom: 1rem;'>📈 Trend Indicators</h3>
+            <p style='color: #5d6d7e; margin: 0.5rem 0;'>• NDVI Trend: {trend_ndvi}</p>
+            <p style='color: #5d6d7e; margin: 0.5rem 0;'>• Precipitation: {trend_precip}</p>
+            <p style='color: #5d6d7e; margin: 0.5rem 0;'>• VCI Trend: {trend_vci}</p>
+            <p style='color: #5d6d7e; margin: 0.5rem 0;'>• Trend Score: {trend_score}</p>
+        </div>
+    """, unsafe_allow_html=True)
+
+# Recommendations based on outlook
+st.markdown("#### 💡 Management Recommendations")
+
+if outlook in ["worsening", "slightly_worsening"]:
+    st.markdown("""
+        <div class="recommendation-box">
+            <h4 style='color: #e74c3c; margin-bottom: 1rem;'>⚠️ Preparedness Actions Recommended:</h4>
+            <ul style='color: #5d6d7e;'>
+                <li>Increase monitoring frequency of water resources</li>
+                <li>Implement water conservation measures in agriculture</li>
+                <li>Prepare for potential irrigation adjustments</li>
+                <li>Coordinate with local water management authorities</li>
+                <li>Review drought contingency plans</li>
+            </ul>
+        </div>
+    """, unsafe_allow_html=True)
+elif outlook in ["improving", "slightly_improving"]:
+    st.markdown("""
+        <div class="recommendation-box">
+            <h4 style='color: #27ae60; margin-bottom: 1rem;'>✅ Favorable Outlook:</h4>
+            <ul style='color: #5d6d7e;'>
+                <li>Current water management practices appear adequate</li>
+                <li>Continue regular monitoring schedule</li>
+                <li>Consider opportunities for agricultural expansion</li>
+                <li>Maintain water storage for dry periods</li>
+            </ul>
+        </div>
+    """, unsafe_allow_html=True)
+else:
+    st.markdown("""
+        <div class="recommendation-box">
+            <h4 style='color: #f39c12; margin-bottom: 1rem;'>🔍 Monitoring Recommended:</h4>
+            <ul style='color: #5d6d7e;'>
+                <li>Maintain current monitoring frequency</li>
+                <li>Watch for sudden changes in conditions</li>
+                <li>Continue standard agricultural practices</li>
+                <li>Prepare for seasonal transitions</li>
+            </ul>
+        </div>
+    """, unsafe_allow_html=True)
+
 # Probability Distribution
-st.markdown('<div class="section-header">📊 Probability Distribution</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-header">📊 Drought Category Probability Distribution</div>', unsafe_allow_html=True)
 
 fig_proba = go.Figure()
 for i, (category, prob) in enumerate(zip(drought_categories, prediction_proba)):
@@ -475,7 +730,7 @@ fig_proba.update_layout(
 )
 st.plotly_chart(fig_proba, use_container_width=True)
 
-# Detailed Analysis
+# Detailed Analysis Sections
 st.markdown('<div class="section-header">📈 Detailed Analysis</div>', unsafe_allow_html=True)
 
 col_a, col_b = st.columns(2, gap="large")
@@ -483,38 +738,48 @@ col_a, col_b = st.columns(2, gap="large")
 with col_a:
     st.markdown("### 🌱 Vegetation Health Analysis")
     
-    st.markdown("#### 🌿 NDVI - Vegetation Health Index")
+    # NDVI Status Assessment
+    if ndvi >= 0.6:
+        ndvi_status = "Excellent 🌿"
+        ndvi_color = "#2ecc71"
+        ndvi_icon = "✅"
+    elif ndvi >= 0.45:
+        ndvi_status = "Good 💧"
+        ndvi_color = "#f1c40f"
+        ndvi_icon = "⚠️"
+    else:
+        ndvi_status = "Poor 🔥"
+        ndvi_color = "#e74c3c"
+        ndvi_icon = "❌"
     
-    # Progress bar for NDVI
-    ndvi_percentage = ((ndvi - 0.2) / (0.8 - 0.2)) * 100
-    st.progress(ndvi_percentage / 100)
+    # VCI Status Assessment
+    if vci > 60:
+        vci_status = "Healthy 🌿"
+        vci_color = "#2ecc71"
+        vci_icon = "✅"
+    elif vci > 40:
+        vci_status = "Moderate 💧"
+        vci_color = "#f39c12"
+        vci_icon = "⚠️"
+    else:
+        vci_status = "Stressed 🔥"
+        vci_color = "#e74c3c"
+        vci_icon = "❌"
     
-    # Metric cards for vegetation health
+    # Vegetation metrics
     col_a1, col_a2 = st.columns(2)
     
     with col_a1:
-        if ndvi >= 0.6:
-            status = "Excellent 🌿"
-            color = "#2ecc71"
-            icon = "✅"
-        elif ndvi >= 0.45:
-            status = "Good 💧"
-            color = "#f1c40f"
-            icon = "⚠️"
-        else:
-            status = "Poor 🔥"
-            color = "#e74c3c"
-            icon = "❌"
-            
         st.markdown(f"""
             <div class="metric-card">
                 <h3 style='color: #2c3e50; margin-bottom: 0.5rem;'>NDVI Status</h3>
-                <p style='color: {color}; font-size: 1.2rem; font-weight: bold; margin: 0;'>{icon} {status}</p>
+                <p style='color: {ndvi_color}; font-size: 1.2rem; font-weight: bold; margin: 0;'>{ndvi_icon} {ndvi_status}</p>
                 <p style='color: #7f8c8d; font-size: 0.9rem; margin: 0.5rem 0 0 0;'>Value: {ndvi:.3f}</p>
             </div>
         """, unsafe_allow_html=True)
     
     with col_a2:
+        ndvi_percentage = ((ndvi - 0.2) / (0.8 - 0.2)) * 100
         st.markdown(f"""
             <div class="metric-card">
                 <h3 style='color: #2c3e50; margin-bottom: 0.5rem;'>Health Level</h3>
@@ -524,35 +789,23 @@ with col_a:
         """, unsafe_allow_html=True)
     
     # VCI metric
-    if vci > 60:
-        vci_status = "Healthy 🌿"
-        vci_color = "#2ecc71"
-        icon = "✅"
-    elif vci > 40:
-        vci_status = "Moderate 💧"
-        vci_color = "#f39c12"
-        icon = "⚠️"
-    else:
-        vci_status = "Stressed 🔥"
-        vci_color = "#e74c3c"
-        icon = "❌"
-        
     st.markdown(f"""
         <div class="metric-card">
             <div style='display: flex; align-items: center; justify-content: space-between;'>
                 <div>
                     <p style='color: #7f8c8d; font-size: 14px; margin: 0;'>Vegetation Condition Index</p>
                     <h2 style='color: #2c3e50; margin: 5px 0;'>{vci:.1f}%</h2>
-                    <p style='color: {vci_color}; font-weight: bold; margin: 0;'>{icon} {vci_status}</p>
+                    <p style='color: {vci_color}; font-weight: bold; margin: 0;'>{vci_icon} {vci_status}</p>
                 </div>
-                <div style='font-size: 3rem;'>{icon}</div>
+                <div style='font-size: 3rem;'>{vci_icon}</div>
             </div>
         </div>
     """, unsafe_allow_html=True)
 
 with col_b:
-    st.markdown("### 🌧️ Precipitation Analysis")
+    st.markdown("### ⛈️ Precipitation Analysis")
     
+    # Precipitation chart
     precip_data = pd.DataFrame({
         'Period': ['Current Month', '3-Month', '6-Month'],
         'Precipitation (mm)': [precip_current, precip_3month, precip_6month],
@@ -573,7 +826,6 @@ with col_b:
         )
     ])
     
-    # Calculate appropriate y-axis range for precipitation chart
     max_precip = max(precip_current, precip_3month, precip_6month)
     y_range_max = max_precip * 1.15
     
@@ -642,11 +894,11 @@ with col_b:
     elif risk_score <= 6:
         risk_level = "Medium Risk" 
         risk_color = "#f39c12"
-        risk_icon = "⚠️"
+        risk_icon = "🔴"
     elif risk_score <= 9:
         risk_level = "High Risk"
         risk_color = "#e67e22"
-        risk_icon = "🔥"
+        risk_icon = "☀️"
     else:
         risk_level = "Severe Risk"
         risk_color = "#e74c3c"
@@ -673,10 +925,10 @@ col_sys1, col_sys2, col_sys3 = st.columns(3)
 with col_sys1:
     st.markdown("""
         <div class="metric-card">
-            <h3 style='color: #2c3e50; margin-bottom: 1rem;'>🌾 Classification</h3>
-            <p style='color: #5d6d7e; margin: 0.5rem 0;'>• 5-Level Drought System</p>
+            <h3 style='color: #2c3e50; margin-bottom: 1rem;'>💾 Classification System</h3>
+            <p style='color: #5d6d7e; margin: 0.5rem 0;'>• 5-Level Drought Classification</p>
             <p style='color: #5d6d7e; margin: 0.5rem 0;'>• VCI + Precipitation Analysis</p>
-            <p style='color: #5d6d7e; margin: 0.5rem 0;'>• Seasonal Pattern Analysis</p>
+            <p style='color: #5d6d7e; margin: 0.5rem 0;'>• Seasonal Pattern Recognition</p>
             <p style='color: #5d6d7e; margin: 0.5rem 0;'>• Multi-Criteria Assessment</p>
         </div>
     """, unsafe_allow_html=True)
@@ -684,7 +936,7 @@ with col_sys1:
 with col_sys2:
     st.markdown("""
         <div class="metric-card">
-            <h3 style='color: #2c3e50; margin-bottom: 1rem;'>🎯 Features</h3>
+            <h3 style='color: #2c3e50; margin-bottom: 1rem;'>🎯 Monitoring Features</h3>
             <p style='color: #5d6d7e; margin: 0.5rem 0;'>• NDVI & VCI Vegetation Indices</p>
             <p style='color: #5d6d7e; margin: 0.5rem 0;'>• Cumulative Rainfall Analysis</p>
             <p style='color: #5d6d7e; margin: 0.5rem 0;'>• Temperature Monitoring</p>
@@ -695,7 +947,7 @@ with col_sys2:
 with col_sys3:
     st.markdown("""
         <div class="metric-card">
-            <h3 style='color: #2c3e50; margin-bottom: 1rem;'>🛠️ Technology</h3>
+            <h3 style='color: #2c3e50; margin-bottom: 1rem;'>🛠️ Technology Stack</h3>
             <p style='color: #5d6d7e; margin: 0.5rem 0;'>• Streamlit Web Framework</p>
             <p style='color: #5d6d7e; margin: 0.5rem 0;'>• XGBoost Machine Learning</p>
             <p style='color: #5d6d7e; margin: 0.5rem 0;'>• Python & R Integration</p>
@@ -711,7 +963,7 @@ st.markdown("""
             Built with Streamlit | XGBoost Model Accuracy: 0.8750 (87.50%)
         </p>
         <p style='color: #5d6d7e; margin: 0.5rem 0; font-size: 13px;'>
-            Data Sources: Google Earth Engine (MODIS, CHIRPS, ERA5) | Region: Mekong Delta, Vietnam | 2025
+            Data Sources: Google Earth Engine (MODIS, CHIRPS, ERA5) | Region: Mekong Delta, Vietnam | November 2024
         </p>
     </div>
 """, unsafe_allow_html=True)
